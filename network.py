@@ -206,7 +206,7 @@ class NetWork(object):
         save_dir = output_dir + "/%d"%(epoch)
         if not os.path.exists(save_dir):
             os.mkdir(save_dir)
-        target = open(save_dir + "val_scores.csv", 'w')
+        target = open(save_dir + "/val_scores.csv", 'w')
         target.write("val_name, avg_accuracy, precision, recall, f1 score, mean iou, %s\n" % (self.name_string))
 
         sess.run(val_init)
