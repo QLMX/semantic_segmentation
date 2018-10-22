@@ -55,35 +55,34 @@ class DataLoader(object):
             # img = cv2.copyMakeBorder(img, 0, 512 - h, 0, 512 - w, cv2.BORDER_CONSTANT)
             # heatmap = cv2.resize(heatmap, (512, 512))
 
-            img = ori_img / 255.0
+            img = np.float32(ori_img) / 255.0
 
-            if self.mode == 'train':
-                pass
-                #flip image
-                if random.random() < cfg.p_flip:
-                    img_flip, ann_flip = self.flip(img, ann)
-                    ann_flip = np.float32(one_hot_it(label=ann_flip, label_values=self.label_value))
-                    yield img_path, size, img_flip, ann_flip
-
-                #rotate image in range of [-30, 30]
-                if random.random() < cfg.p_rotate:
-                    img_rotate, ann_rotate = self.rotate(img, ann)
-                    ann_rotate = np.float32(one_hot_it(label=ann_rotate, label_values=self.label_value))
-                    yield img_path, size, img_rotate, ann_rotate
-
-                # hsv image
-                if random.random() < cfg.p_hsv:
-                    img_hsv = self.random_hsv_transform(ori_img)
-                    img_hsv = img_hsv / 255.0
-                    ann_hsv = np.float32(one_hot_it(label=ann, label_values=self.label_value))
-                    yield img_path, size, img_hsv, ann_hsv
-
-                #gamma
-                if random.random() < cfg.p_gamma:
-                    img_gamma = self.random_gamma_transform(ori_img)
-                    img_gamma = img_gamma / 255.0
-                    ann_gamma = np.float32(one_hot_it(label=ann, label_values=self.label_value))
-                    yield img_path, size, img_gamma, ann_gamma
+            # if self.mode == 'train':
+            #     #flip image
+            #     if random.random() < cfg.p_flip:
+            #         img_flip, ann_flip = self.flip(img, ann)
+            #         ann_flip = np.float32(one_hot_it(label=ann_flip, label_values=self.label_value))
+            #         yield img_path, size, img_flip, ann_flip
+            #
+            #     #rotate image in range of [-30, 30]
+            #     if random.random() < cfg.p_rotate:
+            #         img_rotate, ann_rotate = self.rotate(img, ann)
+            #         ann_rotate = np.float32(one_hot_it(label=ann_rotate, label_values=self.label_value))
+            #         yield img_path, size, img_rotate, ann_rotate
+            #
+            #     # hsv image
+            #     if random.random() < cfg.p_hsv:
+            #         img_hsv = self.random_hsv_transform(ori_img)
+            #         img_hsv = np.float32(img_hsv) / 255.0
+            #         ann_hsv = np.float32(one_hot_it(label=ann, label_values=self.label_value))
+            #         yield img_path, size, img_hsv, ann_hsv
+            #
+            #     #gamma
+            #     if random.random() < cfg.p_gamma:
+            #         img_gamma = self.random_gamma_transform(ori_img)
+            #         img_gamma = np.float32(img_gamma) / 255.0
+            #         ann_gamma = np.float32(one_hot_it(label=ann, label_values=self.label_value))
+            #         yield img_path, size, img_gamma, ann_gamma
 
             ann_convert = np.float32(one_hot_it(label=ann, label_values=self.label_value))
             yield img_path, size, img, ann_convert

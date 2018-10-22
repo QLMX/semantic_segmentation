@@ -15,6 +15,12 @@ import random
 sys.path.append('../')
 from config import cfg
 
+# Takes an absolute file path and returns the name of the file without th extension
+def filepath_to_name(full_name):
+    file_name = os.path.basename(full_name)
+    file_name = os.path.splitext(file_name)[0]
+    return file_name
+
 def get_label_info(csv_path):
     """
     Retrieve the class names and label values for the selected dataset.

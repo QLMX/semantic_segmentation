@@ -16,9 +16,9 @@ import cv2
 sys.path.append("utils")
 from dataLoader import DataLoader
 from tools import buildNetwork
-from dataset import resizeImage
+from dataset import resizeImage, filepath_to_name
 from utils import compute_class_weights, LOG, reverse_one_hot, colour_code_segmentation
-from utils import evaluate_segmentation, filepath_to_name, one_hot_it
+from utils import evaluate_segmentation, one_hot_it
 
 
 class NetWork(object):
@@ -57,13 +57,14 @@ class NetWork(object):
     def _build_solver(self):
         self.global_step = tf.Variable(0, trainable=False)
         starter_learning_rate = self.starter_learning_rate
-        learning_rate = tf.train.exponential_decay(starter_learning_rate, self.global_step,
+        self.learning_rate = tf.train.exponential_decay(starter_learning_rate, self.global_step,
                                                    2000, 0.9, staircase=True)
 
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
-            self.train_op = tf.train.AdamOptimizer(learning_rate).minimize(self.loss,
+            self.train_op = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss,  var_list=[var for var in tf.trainable_variables()],
                                                                            global_step=self.global_step)
+
 
     def _build_model(self):
 
@@ -87,8 +88,10 @@ class NetWork(object):
         self._build_summary()
 
     def _build_summary(self):
-        tf.summary.tensor_summary("loss", self.loss)
-        tf.summary.tensor_summary("learning_rate", self.starter_learning_rate)
+        tf.summary.scalar("loss", self.loss)
+        tf.summary.scalar("learning_rate", self.learning_rate)
+
+        # tf.summary.histogram("train value", tf.trainable_variables)
 
         tf.summary.image("image", self.img)
 
@@ -113,17 +116,16 @@ class NetWork(object):
 
     def _bulid_save_path(self):
         now = datetime.datetime.now()
-        self.save_dir = '../checkpoints/checkpoint/{}/{}_{}/'.format(self.model, now.month, now.day)
-        if not os.path.exists(self.save_dir):
-            os.makedirs(self.save_dir)
-        self.save_dir += '/automatting.ckpt'
+        self.model_dir = '../checkpoints/checkpoint/{}/{}_{}_{}/'.format(self.model, now.month, now.day, now.hour)
+        if not os.path.exists(self.model_dir):
+            os.makedirs(self.model_dir)
 
-        self.summary_dir = '../checkpoints/summary/{}/{}_{}'.format(self.model, now.month, now.day)
+        self.summary_dir = '../checkpoints/summary/{}/{}_{}_{}'.format(self.model, now.month, now.day, now.hour)
         if not os.path.exists(self.summary_dir):
             os.makedirs(self.summary_dir)
 
         # save validation data
-        self.val_dir = '../checkpoints/val/{}/{}_{}'.format(self.model, now.month, now.day)
+        self.val_dir = '../checkpoints/val/{}/{}_{}_{}'.format(self.model, now.month, now.day, now.hour)
         if not os.path.exists(self.val_dir):
             os.makedirs(self.val_dir)
 
@@ -194,14 +196,14 @@ class NetWork(object):
 
                 except tf.errors.OutOfRangeError:
                     print('saving checkpoint......')
-                    saver.save(sess, self.save_dir)
+                    saver.save(sess, os.path.join(self.model_dir, str(self.model + '_' + str(epoch + 1))))
                     print('checkpoint saved.')
                     self.val_out(sess=sess, val_init=val_init, threshold=threshold, output_dir=self.val_dir, epoch=epoch)
 
 
     def val_out(self, sess, val_init, threshold=0.5, output_dir="val", epoch=0):
         print("validation starts.")
-        save_dir = output_dir + "/%4d/"%epoch
+        save_dir = output_dir + "/%d"%(epoch)
         if not os.path.exists(save_dir):
             os.mkdir(save_dir)
         target = open(save_dir + "val_scores.csv", 'w')
@@ -233,7 +235,9 @@ class NetWork(object):
                 accuracy, class_accuracies, prec, rec, f1, iou = evaluate_segmentation(pred=output_image, label=ann,
                                                                                        num_classes=self.num_classes)
 
-                file_name = filepath_to_name(path[0])
+                dir = path[0].decode('ascii')
+                file_name = filepath_to_name(dir)
+
                 target.write("%s, %f, %f, %f, %f, %f" % (file_name, accuracy, prec, rec, f1, iou))
                 for item in class_accuracies:
                     target.write(", %f" % (item))
@@ -255,11 +259,11 @@ class NetWork(object):
                 transparent_image = np.append(np.array(save_ori_img)[:, :, 0:3], out_vis_image[:, :, None], axis=-1)
                 # transparent_image = Image.fromarray(transparent_image)
 
-                cv2.imwrite(save_dir + "%s_img.jpg" % file_name, save_ori_img)
-                cv2.imwrite(save_dir + "%s_ann.png" % file_name, mask)
-                cv2.imwrite(save_dir + "%s_ori_pred.png" % file_name, ori_out_vis)
-                cv2.imwrite(save_dir + "%s_filter_pred.png" % file_name, out_vis_image)
-                cv2.imwrite(save_dir + "%s_mat.png" % file_name, transparent_image)
+                cv2.imwrite(save_dir + "/%s_img.jpg" % (file_name), save_ori_img)
+                cv2.imwrite(save_dir + "/%s_ann.png" % (file_name), mask)
+                cv2.imwrite(save_dir + "/%s_ori_pred.png" % (file_name), ori_out_vis)
+                cv2.imwrite(save_dir + "/%s_filter_pred.png" % (file_name), out_vis_image)
+                cv2.imwrite(save_dir + "/%s_mat.png" % (file_name), transparent_image)
 
                 scores_list.append(accuracy)
                 class_scores_list.append(class_accuracies)
