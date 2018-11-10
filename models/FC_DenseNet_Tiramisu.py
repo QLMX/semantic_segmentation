@@ -3,6 +3,7 @@ import os,time,cv2
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import numpy as np
+from attention_module import attach_attention_module
 
 def preact_conv(inputs, n_filters, kernel_size=[3, 3], dropout_p=0.2):
     """
@@ -17,7 +18,7 @@ def preact_conv(inputs, n_filters, kernel_size=[3, 3], dropout_p=0.2):
     return conv
 
 
-def DenseBlock(stack, n_layers, growth_rate, dropout_p, scope=None):
+def DenseBlock(stack, n_layers, growth_rate, dropout_p, attention_module=None, scope=None):
   """
   DenseBlock for DenseNet and FC-DenseNet
   Arguments:
@@ -38,10 +39,14 @@ def DenseBlock(stack, n_layers, growth_rate, dropout_p, scope=None):
       # Stack new layer
       stack = tf.concat([stack, layer], axis=-1)
     new_features = tf.concat(new_features, axis=-1)
+
+    #add attention_module
+    attach_attention_module(stack, attention_module, scope)
+
     return stack, new_features
 
 
-def TransitionDown(inputs, n_filters, dropout_p=0.2, scope=None):
+def TransitionDown(inputs, n_filters, dropout_p=0.2, attention_module=None, scope=None):
   """
   Transition Down (TD) for FC-DenseNet
   Apply 1x1 BN + ReLU + conv then 2x2 max pooling
@@ -49,10 +54,14 @@ def TransitionDown(inputs, n_filters, dropout_p=0.2, scope=None):
   with tf.name_scope(scope) as sc:
     l = preact_conv(inputs, n_filters, kernel_size=[1, 1], dropout_p=dropout_p)
     l = slim.pool(l, [2, 2], stride=[2, 2], pooling_type='MAX')
+
+    # add attention_module
+    attach_attention_module(l, attention_module, scope)
+
     return l
 
 
-def TransitionUp(block_to_upsample, skip_connection, n_filters_keep, scope=None):
+def TransitionUp(block_to_upsample, skip_connection, n_filters_keep,attention_module=None, scope=None):
   """
   Transition Up for FC-DenseNet
   Performs upsampling on block_to_upsample by a factor 2 and concatenates it with the skip_connection
@@ -62,6 +71,10 @@ def TransitionUp(block_to_upsample, skip_connection, n_filters_keep, scope=None)
     l = slim.conv2d_transpose(block_to_upsample, n_filters_keep, kernel_size=[3, 3], stride=[2, 2], activation_fn=None)
     # Concatenate with skip connection
     l = tf.concat([l, skip_connection], axis=-1)
+
+    # add attention_module
+    # attach_attention_module(l, attention_module, scope)
+
     return l
 
 def build_fc_densenet(inputs, num_classes, preset_model='FC-DenseNet56', n_filters_first_conv=48, n_pool=5, growth_rate=12, n_layers_per_block=4, dropout_p=0.2, scope=None):
@@ -95,7 +108,7 @@ def build_fc_densenet(inputs, num_classes, preset_model='FC-DenseNet56', n_filte
       growth_rate=16
       n_layers_per_block=[4, 5, 7, 10, 12, 15, 12, 10, 7, 5, 4]
     else:
-      raise ValueError("Unsupported FC-DenseNet model '%s'. This function only supports FC-DenseNet56, FC-DenseNet67, and FC-DenseNet103" % (preset_model)) 
+      raise ValueError("Unsupported FC-DenseNet model '%s'. This function only supports FC-DenseNet56, FC-DenseNet67, and FC-DenseNet103" % (preset_model))
 
     if type(n_layers_per_block) == list:
         assert (len(n_layers_per_block) == 2 * n_pool + 1)
@@ -113,7 +126,7 @@ def build_fc_densenet(inputs, num_classes, preset_model='FC-DenseNet56', n_filte
       stack = slim.conv2d(inputs, n_filters_first_conv, [3, 3], scope='first_conv', activation_fn=None)
 
       n_filters = n_filters_first_conv
-      
+
       #####################
       # Downsampling path #
       #####################
@@ -122,13 +135,13 @@ def build_fc_densenet(inputs, num_classes, preset_model='FC-DenseNet56', n_filte
 
       for i in range(n_pool):
         # Dense Block
-        stack, _ = DenseBlock(stack, n_layers_per_block[i], growth_rate, dropout_p, scope='denseblock%d' % (i+1))
+        stack, _ = DenseBlock(stack, n_layers_per_block[i], growth_rate, dropout_p, attention_module='cbam_block', scope='denseblock%d' % (i+1))
         n_filters += growth_rate * n_layers_per_block[i]
         # At the end of the dense block, the current stack is stored in the skip_connections list
         skip_connection_list.append(stack)
 
         # Transition Down
-        stack = TransitionDown(stack, n_filters, dropout_p, scope='transitiondown%d'%(i+1))
+        stack = TransitionDown(stack, n_filters, dropout_p, attention_module='cbam_block', scope='transitiondown%d'%(i+1))
 
       skip_connection_list = skip_connection_list[::-1]
 
@@ -138,7 +151,7 @@ def build_fc_densenet(inputs, num_classes, preset_model='FC-DenseNet56', n_filte
 
       # Dense Block
       # We will only upsample the new feature maps
-      stack, block_to_upsample = DenseBlock(stack, n_layers_per_block[n_pool], growth_rate, dropout_p, scope='denseblock%d' % (n_pool + 1))
+      stack, block_to_upsample = DenseBlock(stack, n_layers_per_block[n_pool], growth_rate, dropout_p, attention_module='cbam_block', scope='denseblock%d' % (n_pool + 1))
 
 
       #######################
@@ -148,11 +161,11 @@ def build_fc_densenet(inputs, num_classes, preset_model='FC-DenseNet56', n_filte
       for i in range(n_pool):
         # Transition Up ( Upsampling + concatenation with the skip connection)
         n_filters_keep = growth_rate * n_layers_per_block[n_pool + i]
-        stack = TransitionUp(block_to_upsample, skip_connection_list[i], n_filters_keep, scope='transitionup%d' % (n_pool + i + 1))
+        stack = TransitionUp(block_to_upsample, skip_connection_list[i], n_filters_keep, attention_module='cbam_block', scope='transitionup%d' % (n_pool + i + 1))
 
         # Dense Block
         # We will only upsample the new feature maps
-        stack, block_to_upsample = DenseBlock(stack, n_layers_per_block[n_pool + i + 1], growth_rate, dropout_p, scope='denseblock%d' % (n_pool + i + 2))
+        stack, block_to_upsample = DenseBlock(stack, n_layers_per_block[n_pool + i + 1], growth_rate, dropout_p, attention_module='cbam_block', scope='denseblock%d' % (n_pool + i + 2))
 
 
       #####################

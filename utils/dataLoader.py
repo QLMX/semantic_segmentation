@@ -57,32 +57,32 @@ class DataLoader(object):
 
             img = np.float32(ori_img) / 255.0
 
-            # if self.mode == 'train':
-            #     #flip image
-            #     if random.random() < cfg.p_flip:
-            #         img_flip, ann_flip = self.flip(img, ann)
-            #         ann_flip = np.float32(one_hot_it(label=ann_flip, label_values=self.label_value))
-            #         yield img_path, size, img_flip, ann_flip
-            #
-            #     #rotate image in range of [-30, 30]
-            #     if random.random() < cfg.p_rotate:
-            #         img_rotate, ann_rotate = self.rotate(img, ann)
-            #         ann_rotate = np.float32(one_hot_it(label=ann_rotate, label_values=self.label_value))
-            #         yield img_path, size, img_rotate, ann_rotate
-            #
-            #     # hsv image
-            #     if random.random() < cfg.p_hsv:
-            #         img_hsv = self.random_hsv_transform(ori_img)
-            #         img_hsv = np.float32(img_hsv) / 255.0
-            #         ann_hsv = np.float32(one_hot_it(label=ann, label_values=self.label_value))
-            #         yield img_path, size, img_hsv, ann_hsv
-            #
-            #     #gamma
-            #     if random.random() < cfg.p_gamma:
-            #         img_gamma = self.random_gamma_transform(ori_img)
-            #         img_gamma = np.float32(img_gamma) / 255.0
-            #         ann_gamma = np.float32(one_hot_it(label=ann, label_values=self.label_value))
-            #         yield img_path, size, img_gamma, ann_gamma
+            if self.mode == 'train':
+                #flip image
+                if random.random() < cfg.p_flip:
+                    img_flip, ann_flip = self.flip(img, ann)
+                    ann_flip = np.float32(one_hot_it(label=ann_flip, label_values=self.label_value))
+                    yield img_path, size, img_flip, ann_flip
+
+                #rotate image in range of [-30, 30]
+                if random.random() < cfg.p_rotate:
+                    img_rotate, ann_rotate = self.rotate(img, ann)
+                    ann_rotate = np.float32(one_hot_it(label=ann_rotate, label_values=self.label_value))
+                    yield img_path, size, img_rotate, ann_rotate
+
+                # hsv image
+                if random.random() < cfg.p_hsv:
+                    img_hsv = self.random_hsv_transform(ori_img)
+                    img_hsv = np.float32(img_hsv) / 255.0
+                    ann_hsv = np.float32(one_hot_it(label=ann, label_values=self.label_value))
+                    yield img_path, size, img_hsv, ann_hsv
+
+                #gamma
+                if random.random() < cfg.p_gamma:
+                    img_gamma = self.random_gamma_transform(ori_img)
+                    img_gamma = np.float32(img_gamma) / 255.0
+                    ann_gamma = np.float32(one_hot_it(label=ann, label_values=self.label_value))
+                    yield img_path, size, img_gamma, ann_gamma
 
             ann_convert = np.float32(one_hot_it(label=ann, label_values=self.label_value))
             yield img_path, size, img, ann_convert
@@ -91,10 +91,10 @@ class DataLoader(object):
 
     def rotate(self, img, ann):
         angle = np.random.uniform(-30, 30)
-        center = (self.height/2, self.width/2)
+        center = (self.width/2, self.height/2)
         rot_mat = cv2.getRotationMatrix2D(center=center, angle=angle, scale=1.0)
-        new_img = cv2.warpAffine(img, rot_mat, (self.height, self.width))
-        new_ann = cv2.warpAffine(ann, rot_mat, (self.height, self.width))
+        new_img = cv2.warpAffine(img, rot_mat, (self.width, self.height), flags=cv2.INTER_NEAREST)
+        new_ann = cv2.warpAffine(ann, rot_mat, (self.width, self.height), flags=cv2.INTER_NEAREST)
 
         return new_img, new_ann
 

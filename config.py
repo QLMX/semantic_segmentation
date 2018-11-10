@@ -42,7 +42,7 @@ class Config:
     #model parameter
     mode = 'train'
     # mode = 'test'
-    model = "FC-DenseNet103"
+    model = "FC-DenseNet56"
     class_balancing = False
     threshold = 0.5
     model_dir = None
@@ -59,7 +59,7 @@ class Config:
 
     #train parameter
     num_epochs = 100
-    batch_size = 2
+    batch_size = 3
     num_val_images = 10
     lr = 0.0001
     num_keep = 1000

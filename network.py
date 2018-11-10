@@ -58,12 +58,11 @@ class NetWork(object):
         self.global_step = tf.Variable(0, trainable=False)
         starter_learning_rate = self.starter_learning_rate
         self.learning_rate = tf.train.exponential_decay(starter_learning_rate, self.global_step,
-                                                   2000, 0.9, staircase=True)
+                                                   2000, 0.96, staircase=True)
 
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
-            self.train_op = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss,  var_list=[var for var in tf.trainable_variables()],
-                                                                           global_step=self.global_step)
+            self.train_op = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss, global_step=self.global_step)
 
 
     def _build_model(self):
@@ -75,7 +74,8 @@ class NetWork(object):
         with tf.variable_scope('loss'):
             if self.class_balancing:
                 print("Computing class weights for trainlabel ...")
-                class_weights = compute_class_weights(labels_dir=self.path, label_values=self.label_values)
+                sess = tf.InteractiveSession()
+                class_weights = compute_class_weights(image_files=self.path.eval(), label_values=self.label_values)
                 weights = tf.reduce_sum(class_weights * self.mask, axis=-1)
                 unweighted_loss = None
                 unweighted_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.logits, labels=self.mask)
@@ -87,11 +87,13 @@ class NetWork(object):
         self._build_solver()
         self._build_summary()
 
+
     def _build_summary(self):
         tf.summary.scalar("loss", self.loss)
         tf.summary.scalar("learning_rate", self.learning_rate)
 
-        # tf.summary.histogram("train value", tf.trainable_variables)
+        for v in tf.trainable_variables():
+            tf.summary.histogram(v.name, v)
 
         tf.summary.image("image", self.img)
 

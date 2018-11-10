@@ -108,9 +108,9 @@ def buildNetwork(model, net_input, num_class):
     if "Res50" in model and not os.path.isfile("models/resnet_v2_50.ckpt"):
         download_checkpoints("ResnetV2", "50")
     if "Res101" in model and not os.path.isfile("models/resnet_v2_101.ckpt"):
-        utils.download_checkpoints("ResnetV2", "101")
+        download_checkpoints("ResnetV2", "101")
     if "Res152" in model and not os.path.isfile("models/resnet_v2_152.ckpt"):
-        utils.download_checkpoints("ResnetV2", "152")
+        download_checkpoints("ResnetV2", "152")
 
     network = None
     init_fn = None
