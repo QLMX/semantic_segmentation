@@ -69,16 +69,16 @@ def get_F1_data(path):
 
 
 def plot_line(y1, y2, y3, min_len):
-    plt.figure(figsize=(12, 5))
-    plt.title('Result Analysis')
+    plt.figure(figsize=(11, 8))
+    plt.title('Average validation accuracy vs epochs')
     x_axix = np.linspace(1, min_len, min_len)
-    plt.plot(x_axix, y1, color='green', label='FCN_ASDenseNet_56B')
-    plt.plot(x_axix, y2, color='red', label='FCN_ASDenseNet_67B')
-    plt.plot(x_axix, y3, color='blue', label='FCN_ASDenseNet_103B')
+    # plt.plot(x_axix, y1, color='green', label='FCN_ASDenseNet_56B')
+    plt.plot(x_axix, y2, color='red', label='Joint_Network')
+    plt.plot(x_axix, y3, color='blue', label='FCN_ADenseNet_103B')
     plt.legend()  # 显示图例
 
-    plt.xlabel('iteration times')
-    plt.ylabel('value')
+    plt.xlabel('Epoch')
+    plt.ylabel('accuracy')
     plt.show()
 
 
@@ -86,12 +86,16 @@ if __name__=="__main__":
     base = "/home/jrs1049/Files/QLMX/graduate/logs/"
     dir = '/home/jrs1049/Files/QLMX/graduate/checkpointsbace'
     path1 =base + "FC_Densenet56_10_31_20.log"
-    path2 = base + "FC_Densenet67_10_29_0.log"
+    path2 = base + "FC_Densenetcrf103_11_19_22.log"
     path3 = base + "FC_Densenet103_11_1_18.log"
 
     value1 = get_log_data(path1)
     value2 = get_log_data(path2)
     value3 = get_log_data(path3)
+
+    # values = get_Pre_data(path3)
+    plot_line(value1, value2, value3, 100)
+    print(np.mean(value2[:-40]), np.mean(value3[:-40]))
 
     # pre = get_Pre_data(path2)
     # call = get_Call_data(path2)
@@ -134,8 +138,8 @@ if __name__=="__main__":
     #     except FileNotFoundError:
     #         pass
 
-    data1 = list(np.array(get_val_data(dir, 'Encoder-Decoder')) - 0.18)
-    data2 = list(np.array(get_val_data(dir, 'FC-DenseNet56_resize'))+ 0.01)
-    data3 = get_val_data(dir, 'FRRN-A')
-    plot_line(data1[:55], data2[:55], data3[:55], 55)
-    print(np.mean(data1[:-20]), np.mean(data2[:-20]), np.mean(data3[:-20]))
+    # data1 = list(np.array(get_val_data(dir, 'Encoder-Decoder')) - 0.18)
+    # data2 = list(np.array(get_val_data(dir, 'FC-DenseNet56_resize'))+ 0.01)
+    # data3 = get_val_data(dir, 'FRRN-A')
+    # plot_line(data1[:55], data2[:55], data3[:55], 55)
+    # print(np.mean(data1[:-20]), np.mean(data2[:-20]), np.mean(data3[:-20]))

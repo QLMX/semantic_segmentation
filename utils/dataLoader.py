@@ -6,7 +6,7 @@
 @contact: wenruichn@gmail.com
 @time: 18-10-18 上午1:22
 """
-import cv2, sys
+import cv2, sys, os
 import numpy as np
 import tensorflow as tf
 import random
@@ -31,26 +31,37 @@ class DataLoader(object):
         self.height = height
         self.width = width
         self.label_value = label_value
-        self.img_paths, self.label_paths = readData(data_dir)
+        if mode == 'test':
+            paths = []
+            for file in os.listdir(data_dir):
+                paths.append(data_dir + '/' + file)
+
+            self.img_paths = paths
+        else:
+            self.img_paths, self.label_paths = readData(data_dir)
+
 
         self.n = len(self.img_paths)
 
     def generator(self, n=0):
         i = 0
+
         if n == 0:
             n = self.n
+
         while i < n:
             img_path = self.img_paths[i]
-            ann_path = self.label_paths[i]
 
             img = load_image(img_path)
-            ann = load_image(ann_path)
+
             h, w, _ = img.shape
             size = [w, h]
+            ori_img = cv2.resize(img, (self.width, self.height), interpolation=cv2.INTER_NEAREST)
 
-
-            ori_img , ann = resizeImage(img, ann, (self.width, self.height))
-            # padding
+            if self.mode != 'test':
+                ann_path = self.label_paths[i]
+                ann = load_image(ann_path)
+                ann = cv2.resize(ann, (self.width, self.height), interpolation=cv2.INTER_NEAREST)
 
             # img = cv2.copyMakeBorder(img, 0, 512 - h, 0, 512 - w, cv2.BORDER_CONSTANT)
             # heatmap = cv2.resize(heatmap, (512, 512))
@@ -84,8 +95,12 @@ class DataLoader(object):
                     ann_gamma = np.float32(one_hot_it(label=ann, label_values=self.label_value))
                     yield img_path, size, img_gamma, ann_gamma
 
-            ann_convert = np.float32(one_hot_it(label=ann, label_values=self.label_value))
-            yield img_path, size, img, ann_convert
+            elif self.mode == 'val':
+                ann_convert = np.float32(one_hot_it(label=ann, label_values=self.label_value))
+                yield img_path, size, img, ann_convert
+
+            else:
+                yield img_path, size, img
 
             i += 1
 
@@ -137,7 +152,6 @@ class DataLoader(object):
         gamma_table = [np.power(x / 255.0, gamma) * 255.0 for x in range(256)]
         gamma_table = np.round(np.array(gamma_table).astype(np.uint8))
         return cv2.LUT(img, gamma_table)
-
 
     def random_gamma_transform(self, img, gamma_vari=2.0):
         """

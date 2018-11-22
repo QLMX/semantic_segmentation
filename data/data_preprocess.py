@@ -53,6 +53,14 @@ def mergeData(val_rate, train_dir_list=cfg.name_list, test_dir=cfg.test_img_dir,
     saveName(val, save_dir + 'val.txt')
     saveName(test, save_dir + 'test.txt')
 
+# Get a list of the training, validation, and testing file paths
+def getTestData(test_dir=cfg.test_img_dir, save_dir=cfg.data_dir):
+    test = []
+
+    for file in os.listdir(test_dir):
+        test.append(test_dir + file)
+
+    saveName(test, save_dir + 'test.txt')
 
 # Get a list of the training, validation, and testing file paths
 def goodData(val_rate, train_dir_list=cfg.good_name, test_dir=cfg.test_img_dir, save_dir=cfg.data_dir):
@@ -82,7 +90,6 @@ def goodData(val_rate, train_dir_list=cfg.good_name, test_dir=cfg.test_img_dir, 
     random.shuffle(data)
     random.shuffle(test)
 
-
     train = data[:-val_num]
     val = data[-val_num:]
 
@@ -91,4 +98,5 @@ def goodData(val_rate, train_dir_list=cfg.good_name, test_dir=cfg.test_img_dir, 
     saveName(test, save_dir + 'test.txt')
 
 if __name__ == '__main__':
-    goodData(0.05)
+    getTestData()
+    # goodData(0.05)

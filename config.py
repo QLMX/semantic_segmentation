@@ -20,7 +20,7 @@ class Config:
     clother_ann_dir = data_dir + 'clother/annotation/'
     street_img_dir = data_dir + 'street/image/'
     street_ann_dir = data_dir + 'street/annotation/'
-    test_img_dir = data_dir + 'test/image/'
+    test_img_dir = data_dir + 'test/'
     test_ann_dir = None
 
     name_list = [ [portrait_img_dir, portrait_ann_dir],
@@ -42,7 +42,7 @@ class Config:
     #model parameter
     mode = 'train'
     # mode = 'test'
-    model = "FC-DenseNet56"
+    model = "FC-DenseNet103"
     class_balancing = False
     threshold = 0.5
     model_dir = None
@@ -59,7 +59,7 @@ class Config:
 
     #train parameter
     num_epochs = 100
-    batch_size = 3
+    batch_size = 2
     num_val_images = 10
     lr = 0.0001
     num_keep = 1000

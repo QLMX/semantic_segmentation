@@ -8,7 +8,7 @@
 """
 import numpy as np
 import sys, datetime
-import os
+import os, cv2
 import tensorflow as tf
 
 from scipy.misc import imread
@@ -276,3 +276,72 @@ def filepath_to_name(full_name):
     file_name = os.path.basename(full_name)
     file_name = os.path.splitext(file_name)[0]
     return file_name
+
+def writer(output_dir, label_values, queue, stop_token='stop'):
+
+    while True:
+        token, path, size, img, output_image = queue.get()
+        if token == stop_token:
+            return
+
+        img = img[0, :, :, :] * 255
+
+        size = (size[0][0], size[0][1])
+
+        output_single_image = np.array(output_image)
+        output_single_image = np.array(output_single_image[0, :, :, :])
+        output_image = reverse_one_hot(output_single_image)
+        out_vis_image = colour_code_segmentation(output_image, label_values)
+
+        dir = path[0].decode('ascii')
+        file_name = filepath_to_name(dir)
+
+
+
+        out_vis_image = cv2.cvtColor(np.uint8(out_vis_image), cv2.COLOR_RGB2BGR)
+        ori_out_vis = cv2.resize(out_vis_image, size, interpolation=cv2.INTER_NEAREST)
+
+        ori_out_vis[ori_out_vis < 0.5 * 255] = 0
+        ori_out_vis[ori_out_vis >= 0.5 * 255] = 255
+
+        save_ori_img = cv2.cvtColor(np.uint8(img), cv2.COLOR_RGB2BGR)
+        save_ori_img = cv2.resize(save_ori_img, size, interpolation=cv2.INTER_NEAREST)
+        # transparent_image = np.append(np.array(save_ori_img)[:, :, 0:3], out_vis_image[:, :, None], axis=-1)
+        # transparent_image = Image.fromarray(transparent_image)
+
+        white = save_ori_img.copy()
+        white[:, :, 0:3] = 255
+
+        blue = save_ori_img.copy()
+        blue[:, :, 0:2] = 0
+        blue[:, :, 2] = 255
+
+        red = save_ori_img.copy()
+        red[:, :, 0] = 255
+        red[:, :, 1:3] = 0
+
+        mask_image = cv2.resize(ori_out_vis, size, interpolation=cv2.INTER_NEAREST)
+        mask_image[mask_image < 0.5 * 255] = 0
+        mask_image[mask_image >= 0.5 * 255] = 255
+
+        img2gray = cv2.cvtColor(mask_image, cv2.COLOR_BGR2GRAY)
+        ret, mask = cv2.threshold(img2gray, 175, 255, cv2.THRESH_BINARY)
+        mask_inv = cv2.bitwise_not(mask)  # 与mask颜色相反，白色变成黑色，黑变白
+        #
+        white_img1_bg = cv2.bitwise_and(white, white, mask=mask_inv)
+        white_img2_fg = cv2.bitwise_and(save_ori_img, save_ori_img, mask=mask)
+        white_img = cv2.add(white_img1_bg, white_img2_fg)
+
+        blue_mg1_bg = cv2.bitwise_and(blue, blue, mask=mask_inv)
+        blue_img2_fg = cv2.bitwise_and(save_ori_img, save_ori_img, mask=mask)
+        blue_img = cv2.add(blue_mg1_bg, blue_img2_fg)
+
+        red_mg1_bg = cv2.bitwise_and(red, red, mask=mask_inv)
+        red_img2_fg = cv2.bitwise_and(save_ori_img, save_ori_img, mask=mask)
+        red_img = cv2.add(red_mg1_bg, red_img2_fg)
+
+        cv2.imwrite(output_dir + "/%s_img.jpg" % (file_name), save_ori_img)
+        cv2.imwrite(output_dir + "/%s_ori_pred.png" % (file_name), ori_out_vis)
+        cv2.imwrite(output_dir + "/%s_mat_white.jpg" % (file_name), white_img)  #白色
+        cv2.imwrite(output_dir + "/%s_mat_blue.jpg" % (file_name), blue_img)  # 白色
+        cv2.imwrite(output_dir + "/%s_mat_red.jpg" % (file_name), red_img)  # 白色

@@ -24,6 +24,9 @@ from DeepLabV3 import build_deeplabv3
 from DeepLabV3_plus import build_deeplabv3_plus
 from AdapNet import build_adaptnet
 
+from crf.crfrnn_layer import CrfRnnLayer
+
+
 def model_checkpoints(url, model_tar, model, model_save):
     subprocess.check_output(['wget', url])
     subprocess.check_output(['tar', '-xvf', model_tar])
@@ -102,7 +105,7 @@ def download_checkpoints(net, model_name):
                               'models')
 
 
-def buildNetwork(model, net_input, num_class):
+def buildNetwork(model, net_input, num_class, size, use_crf_layer):
     # Get the selected model.
     # Some of them require pre-trained ResNet
     if "Res50" in model and not os.path.isfile("models/resnet_v2_50.ckpt"):
@@ -116,6 +119,14 @@ def buildNetwork(model, net_input, num_class):
     init_fn = None
     if model == "FC-DenseNet56" or model == "FC-DenseNet67" or model == "FC-DenseNet103":
         network = build_fc_densenet(net_input, preset_model=model, num_classes=num_class)
+        if use_crf_layer:
+            network = CrfRnnLayer(image_dims=size,
+                                 num_classes=num_class,
+                                 theta_alpha=160.,
+                                 theta_beta=3.,
+                                 theta_gamma=3.,
+                                 num_iterations=10,
+                                 name='crfrnn')([network, net_input])
     elif model == "RefineNet-Res50" or model == "RefineNet-Res101" or model == "RefineNet-Res152":
         # RefineNet requires pre-trained ResNet weights
         network, init_fn = build_refinenet(net_input, preset_model=model, num_classes=num_class)

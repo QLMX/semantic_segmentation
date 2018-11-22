@@ -13,18 +13,23 @@ import multiprocessing
 import numpy as np
 import cv2
 
+import pydensecrf.densecrf as dcrf
+from pydensecrf.utils import compute_unary, create_pairwise_bilateral, \
+    create_pairwise_gaussian, softmax_to_unary
+
 sys.path.append("utils")
 from dataLoader import DataLoader
 from tools import buildNetwork
 from dataset import resizeImage, filepath_to_name
 from utils import compute_class_weights, LOG, reverse_one_hot, colour_code_segmentation
 from utils import evaluate_segmentation, one_hot_it
+from utils import writer
 
 
 class NetWork(object):
 
     def __init__(self, lr, model, label_values=[], name_string=None, name_list=None, height=384, width=384,
-                 is_training=False, class_balancing = False, num_val=10):
+                 is_training=False, class_balancing = False, num_val=10, use_crf_layer=False, mode='train'):
 
         self.starter_learning_rate = lr
         self.model = model
@@ -37,21 +42,30 @@ class NetWork(object):
         self.class_balancing = class_balancing
         self.num_classes = len(label_values)
         self.num_val = num_val
+        self.use_crf_layer = use_crf_layer
+        self.mode = mode
 
-
-        self.output_types = (tf.string, tf.int32, tf.float32, tf.float32)
-        self.output_shapes = (tf.TensorShape([None]),
-                              tf.TensorShape([None, 2]),
-                              tf.TensorShape([None, self.height, self.width, 3]),
-                              tf.TensorShape([None, self.height, self.width, self.num_classes]))
+        if self.mode == 'test':
+            self.output_types = (tf.string, tf.int32, tf.float32)
+            self.output_shapes = (tf.TensorShape([None]),
+                                  tf.TensorShape([None, 2]),
+                                  tf.TensorShape([None, self.height, self.width, 3]))
+        else:
+            self.output_types = (tf.string, tf.int32, tf.float32, tf.float32)
+            self.output_shapes = (tf.TensorShape([None]),
+                                  tf.TensorShape([None, 2]),
+                                  tf.TensorShape([None, self.height, self.width, 3]),
+                                  tf.TensorShape([None, self.height, self.width, self.num_classes]))
         self._build_model()
 
     def _build_input(self):
 
         self.it = tf.data.Iterator.from_structure(self.output_types,
                                                   self.output_shapes)
-        self.path, self.size, self.img, self.mask = self.it.get_next()
-
+        if self.mode == 'test':
+            self.path, self.size, self.img = self.it.get_next()
+        else:
+            self.path, self.size, self.img, self.mask = self.it.get_next()
 
 
     def _build_solver(self):
@@ -65,27 +79,28 @@ class NetWork(object):
             self.train_op = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss, global_step=self.global_step)
 
 
-    def _build_model(self):
+    def _build_model(self, use_crf=True):
 
         self._build_input()
 
-        self.logits, self.init_fn = buildNetwork(self.model, self.img, self.num_classes)
+        self.logits, self.init_fn = buildNetwork(self.model, self.img, self.num_classes, (self.height, self.width), self.use_crf_layer)
 
-        with tf.variable_scope('loss'):
-            if self.class_balancing:
-                print("Computing class weights for trainlabel ...")
-                sess = tf.InteractiveSession()
-                class_weights = compute_class_weights(image_files=self.path.eval(), label_values=self.label_values)
-                weights = tf.reduce_sum(class_weights * self.mask, axis=-1)
-                unweighted_loss = None
-                unweighted_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.logits, labels=self.mask)
-                loss = unweighted_loss * class_weights
-            else:
-                loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.logits, labels=self.mask)
-            self.loss = tf.reduce_mean(loss)
+        if self.mode == 'train':
+            with tf.variable_scope('loss'):
+                if self.class_balancing:
+                    print("Computing class weights for trainlabel ...")
+                    sess = tf.InteractiveSession()
+                    class_weights = compute_class_weights(image_files=self.path.eval(), label_values=self.label_values)
+                    weights = tf.reduce_sum(class_weights * self.mask, axis=-1)
+                    unweighted_loss = None
+                    unweighted_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.logits, labels=self.mask)
+                    loss = unweighted_loss * class_weights
+                else:
+                    loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.logits, labels=self.mask)
+                self.loss = tf.reduce_mean(loss)
 
-        self._build_solver()
-        self._build_summary()
+                self._build_solver()
+                self._build_summary()
 
 
     def _build_summary(self):
@@ -222,6 +237,7 @@ class NetWork(object):
         try:
             while True:
                 img, ann, output_image = sess.run([self.img, self.mask, self.logits])
+                img = img[0, :, :, :] * 255
 
                 ann = np.array(ann[0, :, :, :])
                 ann = reverse_one_hot(ann)
@@ -229,9 +245,9 @@ class NetWork(object):
                 path, size = sess.run([self.path, self.size])
                 size = (size[0][0], size[0][1])
 
-                output_image = np.array(output_image)
-                output_image = np.array(output_image[0, :, :, :])
-                output_image = reverse_one_hot(output_image)
+                output_single_image = np.array(output_image)
+                output_single_image = np.array(output_single_image[0, :, :, :])
+                output_image = reverse_one_hot(output_single_image)
                 out_vis_image = colour_code_segmentation(output_image, self.label_values)
 
                 accuracy, class_accuracies, prec, rec, f1, iou = evaluate_segmentation(pred=output_image, label=ann,
@@ -255,7 +271,7 @@ class NetWork(object):
                 out_vis_image[out_vis_image < threshold * 255] = 0
                 out_vis_image[out_vis_image >= threshold * 255] = 255
 
-                img = img[0, :, :, :] * 255
+
                 save_ori_img = cv2.cvtColor(np.uint8(img), cv2.COLOR_RGB2BGR)
                 save_ori_img = cv2.resize(save_ori_img, size, interpolation=cv2.INTER_NEAREST)
                 transparent_image = np.append(np.array(save_ori_img)[:, :, 0:3], out_vis_image[:, :, None], axis=-1)
@@ -290,39 +306,80 @@ class NetWork(object):
             print("Validation F1 score = ", avg_f1)
             print("Validation IoU score = ", avg_iou)
 
+    def crf_layer(self, img, probabilities):
+        image = img
 
-    def test(self, data_dir='test_b', model_dir=None, output_dir=None):
+        # softmax = self.probabilities.squeeze()
+        #
+        # softmax = processed_probabilities.transpose((2, 0, 1))
+
+        # 输入数据应为概率值的负对数
+        # 你可以在softmax_to_unary函数的定义中找到更多信息
+        unary = softmax_to_unary(probabilities)
+
+        # 输入数据应为C-连续的——我们使用了Cython封装器
+        unary = np.ascontiguousarray(unary)
+
+        d = dcrf.DenseCRF(image.shape[0] * image.shape[1], 2)
+
+        d.setUnaryEnergy(unary)
+
+        # 潜在地对空间上相邻的小块分割区域进行惩罚——促使产生更多空间连续的分割区域
+        feats = create_pairwise_gaussian(sdims=(10, 10), shape=image.shape[:2])
+
+        d.addPairwiseEnergy(feats, compat=3,
+                            kernel=dcrf.DIAG_KERNEL,
+                            normalization=dcrf.NORMALIZE_SYMMETRIC)
+
+        # 这将创建与颜色相关的图像特征——因为我们从卷积神经网络中得到的分割结果非常粗糙，
+        # 我们可以使用局部的颜色特征来改善分割结果
+        feats = create_pairwise_bilateral(sdims=(50, 50), schan=(20, 20, 20),
+                                          img=image, chdim=2)
+
+        d.addPairwiseEnergy(feats, compat=10,
+                            kernel=dcrf.DIAG_KERNEL,
+                            normalization=dcrf.NORMALIZE_SYMMETRIC)
+        Q = d.inference(5)
+
+        res = np.argmax(Q, axis=0).reshape((image.shape[0], image.shape[1]))
+        return res
+
+    def test(self, data_dir='test_b', model_dir=None, output_dir=None, threshold=0.5):
         print("testing starts.")
-        test_loader = DataLoader(data_dir=data_dir, mode='test')
-        testset = tf.data.Dataset.from_generator(generator=test_loader.generator,
+        save_dir = output_dir + '/' + self.model
+        if not os.path.exists(save_dir):
+            os.mkdir(save_dir)
+
+        loader = DataLoader(data_dir=data_dir, mode='test', height=self.height, width=self.width,
+                            label_value=self.label_values)
+        testset = tf.data.Dataset.from_generator(generator=loader.generator,
                                                  output_types=(tf.string,
-                                                               tf.float32,
+                                                               tf.int32,
                                                                tf.float32),
                                                  output_shapes=(tf.TensorShape([]),
-                                                                tf.TensorShape([512, 512, 3]),
-                                                                tf.TensorShape([512, 512, 24])))
-        testset = testset.batch(2)
+                                                                tf.TensorShape([2]),
+                                                                tf.TensorShape([self.height, self.width, 3])))
+
+        testset = testset.batch(1)
         testset = testset.prefetch(10)
         test_init = self.it.make_initializer(testset)
 
         saver = tf.train.Saver()
-
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
+
         with tf.Session(config=config) as sess:
             saver.restore(sess, model_dir)
             sess.run(test_init)
             queue = multiprocessing.Queue(maxsize=30)
-            writer_process = multiprocessing.Process(target=writer, args=[output_dir, queue, 'stop'])
+            writer_process = multiprocessing.Process(target=writer, args=[save_dir, self.label_values, queue, 'stop'])
             writer_process.start()
             print('writing predictions...')
             try:
                 while True:
-                    img_path, heatmaps = sess.run([self.img_path, self.pred_heatmap2])
-                    queue.put(('continue', img_path, heatmaps))
-
+                    img, path, size, output_image = sess.run([self.img, self.path, self.size, self.logits])
+                    queue.put(('continue', path, size, img, output_image))
             except tf.errors.OutOfRangeError:
-                queue.put(('stop', None, None))
+                queue.put(('stop', None, None, None, None))
 
-        writer_process.join()
         print('testing finished.')
