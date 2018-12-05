@@ -14,6 +14,8 @@ import tensorflow as tf
 from scipy.misc import imread
 from sklearn.metrics import precision_score, recall_score, f1_score
 
+from mergeImage import get_black, image_blur, alpha_merge, edge_process, save_img
+
 
 def compute_class_weights(image_files, label_values):
     """
@@ -277,7 +279,7 @@ def filepath_to_name(full_name):
     file_name = os.path.splitext(file_name)[0]
     return file_name
 
-def writer(output_dir, label_values, queue, stop_token='stop'):
+def writer1(output_dir, label_values, queue, stop_token='stop'):
 
     while True:
         token, path, size, img, output_image = queue.get()
@@ -345,3 +347,50 @@ def writer(output_dir, label_values, queue, stop_token='stop'):
         cv2.imwrite(output_dir + "/%s_mat_white.jpg" % (file_name), white_img)  #白色
         cv2.imwrite(output_dir + "/%s_mat_blue.jpg" % (file_name), blue_img)  # 白色
         cv2.imwrite(output_dir + "/%s_mat_red.jpg" % (file_name), red_img)  # 白色
+
+
+def writer(output_dir, label_values, queue, stop_token='stop'):
+
+    while True:
+        token, path, size, img, output_image = queue.get()
+        if token == stop_token:
+            return
+
+        img = img[0, :, :, :] * 255
+
+        size = (size[0][0], size[0][1])
+
+        output_single_image = np.array(output_image)
+        output_single_image = np.array(output_single_image[0, :, :, :])
+        output_image = reverse_one_hot(output_single_image)
+        out_vis_image = colour_code_segmentation(output_image, label_values)
+
+        dir = path[0].decode('ascii')
+        file_name = filepath_to_name(dir)
+
+
+
+        out_vis_image = cv2.cvtColor(np.uint8(out_vis_image), cv2.COLOR_RGB2BGR)
+        mask = cv2.resize(out_vis_image, size, interpolation=cv2.INTER_NEAREST)
+
+        mask[mask < 130] = 0
+        mask[mask >= 130] = 255
+
+        image = cv2.imread(dir)
+
+        mask1, left_up, right_down = image_blur(mask, (5, 5), 80)
+        ww_img, bb_img, rr_img = get_black(size, 'BGR')
+
+        alpha_img_w = alpha_merge(image, ww_img, mask1)
+        alpha_img_b = alpha_merge(image, bb_img, mask1)
+        alpha_img_r = alpha_merge(image, rr_img, mask1)
+
+        img_w = edge_process(alpha_img_w)
+        img_b = edge_process(alpha_img_b)
+        img_r = edge_process(alpha_img_r)
+
+        save_img(img_w, left_up, right_down, '../result/test/w_' + file_name, 1)
+        save_img(img_b, left_up, right_down, '../result/test/b_' + file_name, 1)
+        save_img(img_r, left_up, right_down, '../result/test/r_' + file_name, 1)
+
+

@@ -64,7 +64,6 @@ def readData(path):
                 ann.append(item[1])
     return img, ann
 
-
 def prepare_data(dataset_dir=cfg.data_dir):
     """
     Get a list of the training, validation, and testing file paths
