@@ -7,5 +7,6 @@
     <orderEntry type="module" module-name="Ch6" />
     <orderEntry type="module" module-name="crf" />
     <orderEntry type="module" module-name="semantic_segmentation" />
+    <orderEntry type="module" module-name="simple-faster-rcnn-pytorch-0.3" />
   </component>
 </module>
