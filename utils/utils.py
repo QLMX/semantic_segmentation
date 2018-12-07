@@ -377,9 +377,11 @@ def writer(output_dir, label_values, queue, stop_token='stop'):
         mask[mask >= 130] = 255
 
         image = cv2.imread(dir)
+        size1 = image.shape
+        print(size1)
 
         mask1, left_up, right_down = image_blur(mask, (5, 5), 80)
-        ww_img, bb_img, rr_img = get_black(size, 'BGR')
+        ww_img, bb_img, rr_img = get_black(size1, 'BGR')
 
         alpha_img_w = alpha_merge(image, ww_img, mask1)
         alpha_img_b = alpha_merge(image, bb_img, mask1)
@@ -389,8 +391,8 @@ def writer(output_dir, label_values, queue, stop_token='stop'):
         img_b = edge_process(alpha_img_b)
         img_r = edge_process(alpha_img_r)
 
-        save_img(img_w, left_up, right_down, '../result/test/w_' + file_name, 1)
-        save_img(img_b, left_up, right_down, '../result/test/b_' + file_name, 1)
-        save_img(img_r, left_up, right_down, '../result/test/r_' + file_name, 1)
+        save_img(img_w, left_up, right_down, output_dir + '/w_%s.jpg'%(file_name), 1)
+        save_img(img_b, left_up, right_down, output_dir + '/b_%s.jpg'%(file_name), 1)
+        save_img(img_r, left_up, right_down, output_dir + '/r_%s.jpg'%(file_name), 1)
 
 

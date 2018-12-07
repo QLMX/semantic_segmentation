@@ -69,7 +69,7 @@ class Config:
     continue_training = False
 
     #test parameter
-    test_bath_size = 8
+    test_bath_size = 1
 
 
 cfg = Config()

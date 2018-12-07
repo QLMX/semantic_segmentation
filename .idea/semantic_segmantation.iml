@@ -8,5 +8,6 @@
     <orderEntry type="module" module-name="crf" />
     <orderEntry type="module" module-name="semantic_segmentation" />
     <orderEntry type="module" module-name="simple-faster-rcnn-pytorch-0.3" />
+    <orderEntry type="module" module-name="simple-faster-rcnn-pytorch-master" />
   </component>
 </module>
