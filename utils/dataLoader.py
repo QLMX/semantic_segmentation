@@ -33,8 +33,11 @@ class DataLoader(object):
         self.label_value = label_value
         if mode == 'test':
             paths = []
-            for file in os.listdir(data_dir):
-                paths.append(data_dir + '/' + file)
+            if 'jpg' in data_dir:
+                paths.append(data_dir)
+            else:
+                for file in os.listdir(data_dir):
+                    paths.append(data_dir + '/' + file)
 
             self.img_paths = paths
         else:

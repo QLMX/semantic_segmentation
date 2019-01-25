@@ -346,9 +346,6 @@ class NetWork(object):
 
     def test(self, data_dir='test_b', model_dir=None, output_dir=None, threshold=0.5):
         print("testing starts.")
-        save_dir = output_dir + '/' + self.model
-        if not os.path.exists(save_dir):
-            os.mkdir(save_dir)
 
         loader = DataLoader(data_dir=data_dir, mode='test', height=self.height, width=self.width,
                             label_value=self.label_values)
@@ -372,7 +369,7 @@ class NetWork(object):
             saver.restore(sess, model_dir)
             sess.run(test_init)
             queue = multiprocessing.Queue(maxsize=30)
-            writer_process = multiprocessing.Process(target=writer, args=[save_dir, self.label_values, queue, 'stop'])
+            writer_process = multiprocessing.Process(target=writer, args=[output_dir, self.label_values, queue, 'stop'])
             writer_process.start()
             print('writing predictions...')
             try:

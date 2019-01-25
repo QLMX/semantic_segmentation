@@ -356,8 +356,6 @@ def writer(output_dir, label_values, queue, stop_token='stop'):
         if token == stop_token:
             return
 
-        img = img[0, :, :, :] * 255
-
         size = (size[0][0], size[0][1])
 
         output_single_image = np.array(output_image)
@@ -378,7 +376,6 @@ def writer(output_dir, label_values, queue, stop_token='stop'):
 
         image = cv2.imread(dir)
         size1 = image.shape
-        print(size1)
 
         mask1, left_up, right_down = image_blur(mask, (5, 5), 80)
         ww_img, bb_img, rr_img = get_black(size1, 'BGR')
